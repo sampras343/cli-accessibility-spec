@@ -1,0 +1,18 @@
+id: "CV-5"
+domain: "color"
+level: "A"
+testability: "AUTO"
+spec_version: "1.0"
+name: "TERM=dumb Respect"
+requires: [uses_color]
+steps:
+  - name: "No color with TERM=dumb"
+    exec:
+      args: ["--help"]
+      env:
+        TERM: "dumb"
+    assert:
+      exit_code: 0
+      stdout_not_matches: ['\x1b\[(3[0-7]|9[0-7]|38;5;\d+|38;2;\d+;\d+;\d+)m']
+result_on_all_pass: "Supports"
+result_on_any_fail: "Does Not Support"

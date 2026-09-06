@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/sampras343/cli-accessibility-spec/internal/domains"
+	_ "github.com/sampras343/cli-accessibility-spec/internal/domains/color"
 	"github.com/sampras343/cli-accessibility-spec/internal/engine"
 	"github.com/sampras343/cli-accessibility-spec/internal/report"
 	"github.com/spf13/cobra"
