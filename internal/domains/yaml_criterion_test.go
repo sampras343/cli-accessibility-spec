@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/sampras343/cli-accessibility-spec/internal/engine"
+	"github.com/sampras343/cli-accessibility-spec/internal/probe"
 )
 
 func TestLoadYAMLCriteria(t *testing.T) {
@@ -60,8 +61,8 @@ result_on_any_fail: "Does Not Support"
 		t.Fatal(err)
 	}
 
-	probe := &ProbeResult{HasHelp: true}
-	result := criteria[0].Run(context.Background(), "sh", probe)
+	probeResult := &probe.ProbeResult{HasHelp: true}
+	result := criteria[0].Run(context.Background(), "sh", probeResult)
 	if result.Outcome != engine.Supports {
 		t.Errorf("outcome = %v, want Supports. Remarks: %s", result.Outcome, result.Remarks)
 	}
@@ -185,8 +186,8 @@ result_on_any_fail: "Does Not Support"
 				t.Fatal(err)
 			}
 
-			probe := &ProbeResult{HasHelp: true}
-			result := criteria[0].Run(context.Background(), "sh", probe)
+			probeResult := &probe.ProbeResult{HasHelp: true}
+			result := criteria[0].Run(context.Background(), "sh", probeResult)
 
 			if tt.expectPass {
 				if result.Outcome != engine.Supports {
@@ -241,15 +242,15 @@ result_on_any_fail: "Does Not Support"
 	}
 
 	// Test with preconditions not met
-	probe := &ProbeResult{HasHelp: false}
-	result := criteria[0].Run(context.Background(), "sh", probe)
+	probeResult := &probe.ProbeResult{HasHelp: false}
+	result := criteria[0].Run(context.Background(), "sh", probeResult)
 	if result.Outcome != engine.NotApplicable {
 		t.Errorf("expected NotApplicable when preconditions not met, got %v", result.Outcome)
 	}
 
 	// Test with preconditions met
-	probe = &ProbeResult{HasHelp: true, HasVersion: true}
-	result = criteria[0].Run(context.Background(), "sh", probe)
+	probeResult = &probe.ProbeResult{HasHelp: true, HasVersion: true}
+	result = criteria[0].Run(context.Background(), "sh", probeResult)
 	if result.Outcome != engine.Supports {
 		t.Errorf("expected Supports when preconditions met, got %v. Remarks: %s", result.Outcome, result.Remarks)
 	}

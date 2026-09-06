@@ -167,43 +167,43 @@ func (y *YAMLCriterion) SpecVersion() string {
 }
 
 // Precondition implements Criterion
-func (y *YAMLCriterion) Precondition(probe *ProbeResult) bool {
+func (y *YAMLCriterion) Precondition(probeResult *probe.ProbeResult) bool {
 	for _, req := range y.requires {
 		switch req {
 		case "uses_color":
-			if !probe.HasColor {
+			if !probeResult.HasColor {
 				return false
 			}
 		case "has_help":
-			if !probe.HasHelp {
+			if !probeResult.HasHelp {
 				return false
 			}
 		case "has_version":
-			if !probe.HasVersion {
+			if !probeResult.HasVersion {
 				return false
 			}
 		case "has_subcommands":
-			if !probe.HasSubcommands {
+			if !probeResult.HasSubcommands {
 				return false
 			}
 		case "has_json_flag":
-			if !probe.HasJSONFlag {
+			if !probeResult.HasJSONFlag {
 				return false
 			}
 		case "has_quiet_flag":
-			if !probe.HasQuietFlag {
+			if !probeResult.HasQuietFlag {
 				return false
 			}
 		case "has_color_flag":
-			if !probe.HasColorFlag {
+			if !probeResult.HasColorFlag {
 				return false
 			}
 		case "has_dry_run_flag":
-			if !probe.HasDryRunFlag {
+			if !probeResult.HasDryRunFlag {
 				return false
 			}
 		case "has_no_input_flag":
-			if !probe.HasNoInputFlag {
+			if !probeResult.HasNoInputFlag {
 				return false
 			}
 		default:
@@ -215,7 +215,7 @@ func (y *YAMLCriterion) Precondition(probe *ProbeResult) bool {
 }
 
 // Run implements Criterion
-func (y *YAMLCriterion) Run(ctx context.Context, binary string, probe *ProbeResult) *engine.Result {
+func (y *YAMLCriterion) Run(ctx context.Context, binary string, probeResult *probe.ProbeResult) *engine.Result {
 	start := time.Now()
 
 	result := &engine.Result{
@@ -229,7 +229,7 @@ func (y *YAMLCriterion) Run(ctx context.Context, binary string, probe *ProbeResu
 	}
 
 	// Check preconditions
-	if !y.Precondition(probe) {
+	if !y.Precondition(probeResult) {
 		result.Outcome = engine.NotApplicable
 		result.Remarks = "Preconditions not met"
 		result.Duration = time.Since(start)

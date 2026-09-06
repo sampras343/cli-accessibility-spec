@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/sampras343/cli-accessibility-spec/internal/engine"
+	"github.com/sampras343/cli-accessibility-spec/internal/probe"
 )
 
 type mockDomain struct {
@@ -26,8 +27,8 @@ func (c *mockCriterion) Domain() string            { return c.domain }
 func (c *mockCriterion) Level() engine.Level       { return engine.LevelA }
 func (c *mockCriterion) Testability() engine.Testability { return engine.Auto }
 func (c *mockCriterion) SpecVersion() string       { return "1.0" }
-func (c *mockCriterion) Precondition(_ *ProbeResult) bool { return true }
-func (c *mockCriterion) Run(_ context.Context, _ string, _ *ProbeResult) *engine.Result {
+func (c *mockCriterion) Precondition(_ *probe.ProbeResult) bool { return true }
+func (c *mockCriterion) Run(_ context.Context, _ string, _ *probe.ProbeResult) *engine.Result {
 	return &engine.Result{ID: c.id, Outcome: engine.Supports}
 }
 
