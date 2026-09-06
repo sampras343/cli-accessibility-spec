@@ -70,7 +70,7 @@ Use filters to focus on specific criteria or domains.`,
 	cmd.Flags().StringVar(&flags.level, "level", "", "Filter criteria by level (A, AA, AAA)")
 	cmd.Flags().BoolVar(&flags.autoOnly, "auto-only", false, "Run only AUTO criteria, skip SEMI and MANUAL")
 	cmd.Flags().StringVar(&flags.threshold, "threshold", "A", "Conformance level required for exit 0 (A, AA, AAA)")
-	cmd.Flags().StringVar(&flags.format, "format", "terminal", "Output format: terminal, json")
+	cmd.Flags().StringVar(&flags.format, "format", "terminal", "Output format: terminal, json, markdown, html")
 	cmd.Flags().StringVar(&flags.output, "output", "", "Write report to file instead of stdout")
 	cmd.Flags().BoolVar(&flags.crosswalk, "crosswalk", false, "Include WCAG/508/EN 301 549 mapping in report")
 	cmd.Flags().BoolVar(&flags.plain, "plain", false, "Screen-reader-friendly output (no tables, no box-drawing, no color)")

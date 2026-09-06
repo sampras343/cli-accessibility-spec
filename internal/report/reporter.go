@@ -50,4 +50,6 @@ func init() {
 	// Register built-in reporters
 	Register(&JSONReporter{})
 	Register(&TerminalReporter{})
+	Register(&MarkdownReporter{})
+	Register(&HTMLReporter{})
 }
