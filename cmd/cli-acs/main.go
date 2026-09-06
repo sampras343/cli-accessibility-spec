@@ -34,6 +34,7 @@ environment handling, timing, internationalization, and lifecycle.`,
 
 	// Add subcommands
 	rootCmd.AddCommand(newCheckCommand())
+	rootCmd.AddCommand(newCoverageCommand())
 	rootCmd.AddCommand(newValidateCommand())
 	rootCmd.AddCommand(newVersionCommand())
 
