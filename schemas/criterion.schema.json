@@ -1,0 +1,223 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cli-acs.org/schemas/criterion.schema.json",
+  "title": "CLI-ACS Criterion",
+  "description": "A criterion definition for CLI Accessibility Conformance Suite",
+  "type": "object",
+  "required": [
+    "id",
+    "domain",
+    "level",
+    "testability",
+    "spec_version",
+    "name",
+    "steps",
+    "result_on_all_pass",
+    "result_on_any_fail"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "Unique identifier for the criterion",
+      "pattern": "^[A-Z0-9]+-[0-9]+$"
+    },
+    "domain": {
+      "type": "string",
+      "description": "Domain this criterion belongs to",
+      "examples": ["output", "input", "color", "help", "errors", "environment", "timing"]
+    },
+    "level": {
+      "type": "string",
+      "enum": ["A", "AA", "AAA"],
+      "description": "Conformance level (A, AA, or AAA)"
+    },
+    "testability": {
+      "type": "string",
+      "enum": ["AUTO", "SEMI", "MANUAL"],
+      "description": "Testability type"
+    },
+    "spec_version": {
+      "type": "string",
+      "description": "Version of the CLI-ACS specification",
+      "pattern": "^[0-9]+\\.[0-9]+$"
+    },
+    "name": {
+      "type": "string",
+      "description": "Human-readable name of the criterion"
+    },
+    "requires": {
+      "type": "array",
+      "description": "Preconditions that must be met for this criterion to be applicable",
+      "items": {
+        "type": "string",
+        "enum": [
+          "uses_color",
+          "has_help",
+          "has_version",
+          "has_subcommands",
+          "has_json_flag",
+          "has_quiet_flag",
+          "has_color_flag",
+          "has_dry_run_flag",
+          "has_no_input_flag"
+        ]
+      }
+    },
+    "steps": {
+      "type": "array",
+      "description": "Test steps to execute",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["name", "assert"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Name of the step"
+          },
+          "exec": {
+            "type": "object",
+            "description": "Execute command without PTY",
+            "properties": {
+              "args": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "Command arguments"
+              },
+              "env": {
+                "type": "object",
+                "additionalProperties": {"type": "string"},
+                "description": "Environment variables"
+              },
+              "timeout_ms": {
+                "type": "integer",
+                "description": "Timeout in milliseconds",
+                "minimum": 1
+              }
+            },
+            "required": ["args"]
+          },
+          "exec_pty": {
+            "type": "object",
+            "description": "Execute command with PTY",
+            "properties": {
+              "args": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "Command arguments"
+              },
+              "env": {
+                "type": "object",
+                "additionalProperties": {"type": "string"},
+                "description": "Environment variables"
+              },
+              "timeout_ms": {
+                "type": "integer",
+                "description": "Timeout in milliseconds",
+                "minimum": 1
+              }
+            },
+            "required": ["args"]
+          },
+          "assert": {
+            "type": "object",
+            "description": "Assertions to evaluate",
+            "properties": {
+              "exit_code": {
+                "type": "integer",
+                "description": "Expected exit code"
+              },
+              "exit_code_nonzero": {
+                "type": "boolean",
+                "description": "Assert exit code is nonzero"
+              },
+              "stdout_matches": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "Regex patterns that must match stdout"
+              },
+              "stdout_not_matches": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "Regex patterns that must not match stdout"
+              },
+              "stderr_matches": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "Regex patterns that must match stderr"
+              },
+              "stderr_not_matches": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "Regex patterns that must not match stderr"
+              },
+              "stdout_contains": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "Strings that must be present in stdout"
+              },
+              "stdout_not_contains": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "Strings that must not be present in stdout"
+              },
+              "stderr_contains": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "Strings that must be present in stderr"
+              },
+              "stderr_not_contains": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "Strings that must not be present in stderr"
+              },
+              "stdout_empty": {
+                "type": "boolean",
+                "description": "Assert stdout is empty"
+              },
+              "stderr_empty": {
+                "type": "boolean",
+                "description": "Assert stderr is empty"
+              },
+              "timing_under_ms": {
+                "type": "integer",
+                "description": "Assert execution completes under this many milliseconds",
+                "minimum": 1
+              }
+            }
+          }
+        },
+        "oneOf": [
+          {"required": ["exec"]},
+          {"required": ["exec_pty"]}
+        ]
+      }
+    },
+    "result_on_all_pass": {
+      "type": "string",
+      "enum": [
+        "Supports",
+        "Partially Supports",
+        "Does Not Support",
+        "Not Applicable",
+        "Not Evaluated",
+        "Error",
+        "Timeout"
+      ],
+      "description": "Outcome when all steps pass"
+    },
+    "result_on_any_fail": {
+      "type": "string",
+      "enum": [
+        "Supports",
+        "Partially Supports",
+        "Does Not Support",
+        "Not Applicable",
+        "Not Evaluated",
+        "Error",
+        "Timeout"
+      ],
+      "description": "Outcome when any step fails"
+    }
+  }
+}
