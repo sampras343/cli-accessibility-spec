@@ -17,7 +17,9 @@ var testcaseFS embed.FS
 func init() {
 	d := &HelpDomain{}
 	// Register Go-defined criteria (complex checks requiring multi-step logic)
+	d.criteria = append(d.criteria, &HD1Check{})
 	d.criteria = append(d.criteria, &HD2Check{})
+	d.criteria = append(d.criteria, &HD3Check{})
 	d.criteria = append(d.criteria, &HD5Check{})
 	d.criteria = append(d.criteria, &HD6Check{})
 	d.criteria = append(d.criteria, &HD7Check{})

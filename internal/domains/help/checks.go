@@ -13,6 +13,151 @@ import (
 )
 
 // ---------------------------------------------------------------------------
+// HD-1: --help and -h Flags [A, AUTO]
+// Tries --help, -h, and bare "help" subcommand. Passes if any form works.
+// ---------------------------------------------------------------------------
+
+type HD1Check struct{}
+
+func (c *HD1Check) ID() string                         { return "HD-1" }
+func (c *HD1Check) Name() string                       { return "--help and -h Flags" }
+func (c *HD1Check) Domain() string                     { return "help" }
+func (c *HD1Check) Level() engine.Level                { return engine.LevelA }
+func (c *HD1Check) Testability() engine.Testability    { return engine.Auto }
+func (c *HD1Check) SpecVersion() string                { return "1.0" }
+func (c *HD1Check) Precondition(_ *probe.ProbeResult) bool { return true }
+
+func (c *HD1Check) Run(ctx context.Context, binary string, p *probe.ProbeResult) *engine.Result {
+	start := time.Now()
+	result := &engine.Result{
+		ID: "HD-1", Name: c.Name(), Domain: "help",
+		Level: engine.LevelA, Testability: engine.Auto, SpecVersion: "1.0",
+	}
+
+	forms := []struct {
+		name string
+		args []string
+	}{
+		{"--help", []string{"--help"}},
+		{"-h", []string{"-h"}},
+		{"help (bare subcommand)", []string{"help"}},
+	}
+
+	var passedForms []string
+	var evidence []engine.Evidence
+
+	for _, form := range forms {
+		out, err := probe.Run(ctx, binary, probe.ExecOpts{
+			Args:    form.args,
+			Timeout: 5 * time.Second,
+		})
+		if err != nil {
+			continue
+		}
+		ev := engine.Evidence{
+			Command:  out.Command,
+			Stdout:   truncate(string(out.Stdout), 500),
+			Stderr:   truncate(string(out.Stderr), 500),
+			ExitCode: out.ExitCode,
+			Duration: out.Duration,
+		}
+		if out.ExitCode == 0 && len(out.Stdout) > 0 {
+			ev.Note = fmt.Sprintf("%s: exit 0, %d bytes on stdout — PASS", form.name, len(out.Stdout))
+			passedForms = append(passedForms, form.name)
+		} else {
+			ev.Note = fmt.Sprintf("%s: exit %d, %d bytes stdout — does not satisfy criterion", form.name, out.ExitCode, len(out.Stdout))
+		}
+		evidence = append(evidence, ev)
+	}
+
+	result.Evidence = evidence
+	result.Duration = time.Since(start)
+
+	if len(passedForms) >= 2 {
+		result.Outcome = engine.Supports
+		result.Remarks = fmt.Sprintf("Help available via: %s", strings.Join(passedForms, ", "))
+	} else if len(passedForms) == 1 {
+		result.Outcome = engine.PartiallySupports
+		result.Remarks = fmt.Sprintf("Help available only via %s — tools should support at least --help and one alternative (e.g., -h or bare 'help' subcommand)", passedForms[0])
+	} else {
+		result.Outcome = engine.DoesNotSupport
+		result.Remarks = "No help form works (tried --help, -h, and bare 'help' subcommand)"
+	}
+	return result
+}
+
+// ---------------------------------------------------------------------------
+// HD-3: --version Flag [A, AUTO]
+// Tries --version, -V, and bare "version" subcommand. Passes if any works.
+// ---------------------------------------------------------------------------
+
+type HD3Check struct{}
+
+func (c *HD3Check) ID() string                         { return "HD-3" }
+func (c *HD3Check) Name() string                       { return "--version Flag" }
+func (c *HD3Check) Domain() string                     { return "help" }
+func (c *HD3Check) Level() engine.Level                { return engine.LevelA }
+func (c *HD3Check) Testability() engine.Testability    { return engine.Auto }
+func (c *HD3Check) SpecVersion() string                { return "1.0" }
+func (c *HD3Check) Precondition(_ *probe.ProbeResult) bool { return true }
+
+func (c *HD3Check) Run(ctx context.Context, binary string, p *probe.ProbeResult) *engine.Result {
+	start := time.Now()
+	result := &engine.Result{
+		ID: "HD-3", Name: c.Name(), Domain: "help",
+		Level: engine.LevelA, Testability: engine.Auto, SpecVersion: "1.0",
+	}
+
+	forms := []struct {
+		name string
+		args []string
+	}{
+		{"--version", []string{"--version"}},
+		{"-V", []string{"-V"}},
+		{"version (bare subcommand)", []string{"version"}},
+	}
+
+	var passedForms []string
+	var evidence []engine.Evidence
+
+	for _, form := range forms {
+		out, err := probe.Run(ctx, binary, probe.ExecOpts{
+			Args:    form.args,
+			Timeout: 5 * time.Second,
+		})
+		if err != nil {
+			continue
+		}
+		ev := engine.Evidence{
+			Command:  out.Command,
+			Stdout:   truncate(string(out.Stdout), 500),
+			Stderr:   truncate(string(out.Stderr), 500),
+			ExitCode: out.ExitCode,
+			Duration: out.Duration,
+		}
+		if out.ExitCode == 0 && len(out.Stdout) > 0 {
+			ev.Note = fmt.Sprintf("%s: exit 0, output present — PASS", form.name)
+			passedForms = append(passedForms, form.name)
+		} else {
+			ev.Note = fmt.Sprintf("%s: exit %d — does not satisfy criterion", form.name, out.ExitCode)
+		}
+		evidence = append(evidence, ev)
+	}
+
+	result.Evidence = evidence
+	result.Duration = time.Since(start)
+
+	if len(passedForms) >= 1 {
+		result.Outcome = engine.Supports
+		result.Remarks = fmt.Sprintf("Version info available via: %s", strings.Join(passedForms, ", "))
+	} else {
+		result.Outcome = engine.DoesNotSupport
+		result.Remarks = "No version form works (tried --version, -V, and bare 'version' subcommand)"
+	}
+	return result
+}
+
+// ---------------------------------------------------------------------------
 // HD-2: Subcommand Help [A, AUTO]
 // ---------------------------------------------------------------------------
 
