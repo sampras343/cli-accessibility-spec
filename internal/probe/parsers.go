@@ -2,6 +2,7 @@ package probe
 
 import (
 	"bufio"
+	"regexp"
 	"strings"
 )
 
@@ -95,9 +96,13 @@ func (p *CobraParser) Parse(text string) (*ParsedHelp, error) {
 		}
 
 		if inCommands {
-			// Parse subcommand line: "  list        List all items"
-			// or "  auth:          Authenticate gh and git"
-			if strings.HasPrefix(line, " ") || strings.HasPrefix(line, "\t") {
+			// Parse subcommand line. Two formats:
+			// Indented: "  list        List all items" (most cobra tools)
+			// Flush:    "list                  List all items" (cosign-style)
+			// Both have a command name followed by 2+ spaces then description.
+			isIndented := strings.HasPrefix(line, " ") || strings.HasPrefix(line, "\t")
+			hasMultiSpaceGap := regexp.MustCompile(`^\S+\s{2,}`).MatchString(trimmed)
+			if isIndented || hasMultiSpaceGap {
 				parts := strings.Fields(trimmed)
 				if len(parts) >= 1 {
 					name := strings.TrimSuffix(parts[0], ":")
