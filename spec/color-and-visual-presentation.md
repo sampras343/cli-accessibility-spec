@@ -18,6 +18,8 @@ This document provides the detailed specification for the Color & Visual Present
    - 1.4 [Color Vision Deficiency (Color Blindness)](#14-color-vision-deficiency-color-blindness)
    - 1.5 [Contrast in Terminal Contexts](#15-contrast-in-terminal-contexts)
    - 1.6 [Screen Readers and Terminal Styling](#16-screen-readers-and-terminal-styling)
+   - 1.7 [Terminal Hyperlinks (OSC 8)](#17-terminal-hyperlinks-osc-8)
+   - 1.8 [Unicode Symbols and Screen Readers](#18-unicode-symbols-and-screen-readers)
 2. [Criteria](#2-criteria)
    - [CV-1: Color Not Sole Information Channel](#cv-1-color-not-sole-information-channel)
    - [CV-2: `NO_COLOR` Support](#cv-2-no_color-support)
@@ -31,6 +33,9 @@ This document provides the detailed specification for the Color & Visual Present
    - [CV-10: Color Configuration Precedence](#cv-10-color-configuration-precedence)
    - [CV-11: High Contrast Mode Support](#cv-11-high-contrast-mode-support)
    - [CV-12: Bold/Underline as Structural Cues](#cv-12-boldunderline-as-structural-cues)
+   - [CV-13: Terminal Hyperlink Accessibility](#cv-13-terminal-hyperlink-accessibility)
+   - [CV-14: Foreground-Background Pair Contrast](#cv-14-foreground-background-pair-contrast)
+   - [CV-15: Unicode/Emoji Symbol Accessibility](#cv-15-unicodeemoji-symbol-accessibility)
 3. [References](#3-references)
 
 ---
@@ -296,6 +301,57 @@ These heuristics work best with clean, predictable, linear text output. Complex 
 
 **Practical implication for all criteria in this domain:** Every piece of information conveyed by color or styling MUST also be conveyed by text. This is not a general best practice — it is a hard requirement for screen reader accessibility. The text-based alternative is not a fallback for edge cases; it is the primary information channel for screen reader users.
 
+### 1.7 Terminal Hyperlinks (OSC 8)
+
+OSC 8 is an escape sequence for embedding clickable URLs in terminal output, functioning similarly to HTML's `<a>` tag. The format is:
+
+```
+\x1b]8;;URI\a visible text \x1b]8;;\a
+```
+
+Where `\x1b]` is the OSC introducer and `\a` (BEL) is the string terminator. The visible text is displayed normally; the URI is hidden metadata that makes the text clickable in supporting terminals.
+
+**Adoption:** OSC 8 was introduced by VTE (GNOME Terminal) and iTerm2 in 2017. Tools that emit hyperlinks include:
+- `ls --hyperlink=always` — links filenames to `file://` URIs
+- GCC — links error codes to documentation pages
+- Rust's `cargo` — links to crate documentation
+- `systemd` — links unit names to documentation
+
+**Accessibility implications:**
+- Screen readers read the character buffer and do not interpret OSC sequences — hyperlinks are invisible to assistive technology.
+- Terminals that don't support OSC 8 silently ignore the sequences, displaying only the visible text — a built-in graceful degradation.
+- OSC sequences are NOT SGR codes. Tools that strip only SGR codes for `NO_COLOR` may leave raw OSC bytes in output, producing garbled text in `TERM=dumb` environments like Emacs shell buffers.
+- There is currently no way to detect whether the terminal supports hyperlinks, so tools cannot conditionally emit them.
+
+The key accessibility rule: the information a hyperlink provides (the URL, the target) must also be discoverable without the hyperlink — through the visible text itself or through other output (e.g., printing the URL separately).
+
+### 1.8 Unicode Symbols and Screen Readers
+
+Modern CLI tools increasingly use Unicode symbols for visual communication:
+- Checkmarks: ✓ (U+2713), ✗ (U+2717), ✔ (U+2714), ✘ (U+2718)
+- Status circles: ● (U+25CF), ○ (U+25CB), ◉ (U+25C9)
+- Arrows: ▶ (U+25B6), ◀ (U+25C0), → (U+2192)
+- Warning/info: ⚠ (U+26A0), ℹ (U+2139)
+- Emoji: 🔴 🟢 🟡 ✅ ❌ ⏳ 🚀
+
+**The screen reader problem:** Screen readers announce the official Unicode character name, not the developer's intended meaning. A user hears:
+
+- ✓ → "CHECK MARK"
+- ✗ → "BALLOT X"
+- ● → "BLACK CIRCLE"
+- ▶ → "BLACK RIGHT-POINTING TRIANGLE"
+- ⚠ → "WARNING SIGN"
+
+While some names are reasonably meaningful (CHECK MARK, WARNING SIGN), others are opaque (BLACK CIRCLE, BLACK RIGHT-POINTING TRIANGLE). When multiple symbols appear in sequence — as in test output or status dashboards — the stream of Unicode names becomes cognitive noise.
+
+**The tofu problem:** Terminals without fonts covering the required Unicode ranges render symbols as boxes (□), called "tofu." This is common on minimal Linux installations, SSH sessions to servers with limited font coverage, and older terminals. All visual meaning is lost.
+
+**The solution:** Pair every semantic symbol with a text alternative:
+- `✓ PASS` instead of bare `✓`
+- `[FAIL] ✗` instead of bare `✗`
+- `▶ Running` instead of bare `▶`
+- Provide a `--plain` or `--ascii` mode that replaces symbols entirely: `[OK]`, `[FAIL]`, `[WARN]`, `[INFO]`
+
 ---
 
 ## 2. Criteria
@@ -369,8 +425,8 @@ These heuristics work best with clean, predictable, linear text output. Complex 
 |---|---|
 | **Level** | AA |
 | **Testability** | `[AUTO]` |
-| **Requirement** | The tool SHOULD support a `--color=WHEN` flag accepting at least three values: `always` (force color regardless of TTY status, `NO_COLOR`, or `TERM=dumb`), `never` (suppress all color — equivalent to `--no-color`), and `auto` (default behavior — enable color only when output is a TTY and no disable signals are set). The flag MAY also be spelled `--colour=WHEN`. The `--color` flag takes the highest precedence in the color configuration stack — it overrides all environment variables and config files. |
-| **Rationale** | The `auto`/`always`/`never` tri-state gives users complete control over color behavior for any context. `auto` is the safe default. `always` is needed for piping colored output through tools like `less -R` that can interpret escape sequences, or for capturing colored output in tools that render ANSI (e.g., `bat`, `delta`). `never` provides explicit opt-out. This flag pattern is established by coreutils (`ls --color=auto`), `grep --color=auto`, `git config color.ui auto`, `ripgrep --color=auto`, and many other widely-used tools. |
+| **Requirement** | The tool SHOULD support a `--color=WHEN` flag accepting at least three values: `always` (force color regardless of TTY status, `NO_COLOR`, or `TERM=dumb`), `never` (suppress all color — equivalent to `--no-color`), and `auto` (default behavior — enable color only when output is a TTY and no disable signals are set). The flag MAY also be spelled `--colour=WHEN`. The `--color` flag takes the highest precedence in the color configuration stack — it overrides all environment variables and config files. Tools MAY use non-standard flag names for the same concept (e.g., GCC uses `-fdiagnostics-color=auto/always/never`, clang uses `-fcolor-diagnostics`/`-fno-color-diagnostics`). Such tools satisfy the intent of this criterion if the flag provides equivalent auto/always/never modes. |
+| **Rationale** | The `auto`/`always`/`never` tri-state gives users complete control over color behavior for any context. `auto` is the safe default. `always` is needed for piping colored output through tools like `less -R` that can interpret escape sequences, or for capturing colored output in tools that render ANSI (e.g., `bat`, `delta`). `never` provides explicit opt-out. This flag pattern is established by coreutils (`ls --color=auto`), `grep --color=auto`, `git config color.ui auto`, `ripgrep --color=auto`, and many other widely-used tools. Non-standard flag names exist in the ecosystem (GCC, clang) and satisfy the same user need. |
 | **Test method** | (1) `--color=never`: verify no ANSI color codes in output. (2) `--color=always` with piped output (stdout is not a TTY): verify ANSI color codes ARE present despite non-TTY. (3) `--color=auto` on a TTY: verify color present. (4) `--color=auto` piped through `cat`: verify no color. |
 | **Disability impact** | Visual, Motor (reduces number of steps needed to control color per-invocation) |
 | **WCAG mapping** | — |
@@ -464,6 +520,45 @@ These heuristics work best with clean, predictable, linear text output. Complex 
 | **WCAG mapping** | 1.3.1 Info and Relationships |
 | **References** | [W3C: Background on Text / Command-Line / Terminal Applications](https://github.com/w3c/wcag2ict/blob/main/background-on-text-command-line-terminal-applications-and-interfaces.md), [ECMA-48 SGR Codes](https://strasis.com/documentation/limelight-xe/reference/ecma-48-sgr-codes) |
 
+### CV-13: Terminal Hyperlink Accessibility
+
+| | |
+|---|---|
+| **Level** | AA |
+| **Testability** | `[SEMI]` |
+| **Requirement** | When the tool emits OSC 8 terminal hyperlinks (`\x1b]8;;URI\a text \x1b]8;;\a`), the linked text MUST be meaningful on its own without the hyperlink — the URL MUST NOT be the only way to discover the link target. OSC 8 sequences MUST be suppressed when `TERM=dumb` is set and SHOULD be suppressed when `NO_COLOR` is set. Tools MUST NOT rely on hyperlink functionality as the only means of providing a reference, since screen readers and many terminal emulators do not support OSC 8. |
+| **Rationale** | OSC 8 terminal hyperlinks (introduced by VTE/GNOME Terminal and iTerm2 in 2017) allow clickable URLs in terminal output — similar to HTML `<a>` tags. Tools like `ls --hyperlink`, GCC (linking error codes to documentation), and Rust's `cargo` use them. However, screen readers interact with the terminal's character buffer and do not interpret OSC sequences — the hyperlink is invisible to assistive technology. Many terminal emulators still don't support OSC 8, and unsupported terminals silently ignore the sequences (showing only the visible text). If the URL is meaningful information that users need (e.g., a documentation link), it must be discoverable without relying on the hyperlink. Additionally, OSC sequences are not SGR codes — they can survive `NO_COLOR` suppression if tools only strip SGR, leaving raw `\x1b]8;;...` bytes visible in `TERM=dumb` environments. |
+| **Test method** | (1) Run the tool with default settings and scan for OSC 8 sequences (`\x1b]8;`). (2) If present, run with `TERM=dumb` and verify OSC 8 sequences are suppressed. (3) Run with `NO_COLOR=1` and verify OSC 8 sequences are suppressed. (4) Verify the linked text is descriptive — not just "click here", "link", or an opaque code. The information conveyed by the hyperlink must be accessible without clicking it. |
+| **Disability impact** | Visual |
+| **WCAG mapping** | 2.4.4 Link Purpose (In Context) |
+| **References** | [OSC 8 Hyperlinks spec](https://gist.github.com/egmontkob/eb114294efbcd5adb1944c9f3cb5feda), [OSC 8 Adoption tracker](https://github.com/Alhadis/OSC8-Adoption/) |
+
+### CV-14: Foreground-Background Pair Contrast
+
+| | |
+|---|---|
+| **Level** | AA |
+| **Testability** | `[SEMI]` |
+| **Requirement** | When the tool sets both foreground AND background colors in its output (e.g., colored status badges, highlighted sections, LS_COLORS-style file type indicators), the contrast ratio between the foreground and background colors MUST be at least 4.5:1 for normal text. This applies to 4-bit ANSI color pairs (evaluated using xterm default RGB mappings), fixed 8-bit color pairs, and 24-bit color pairs. The tool MUST NOT produce foreground-background combinations that fail this ratio in its default configuration. |
+| **Rationale** | CV-9 checks whether fixed foreground colors contrast against the terminal's background — but a tool can also set its OWN background color, creating a self-contained color pair that the terminal theme cannot fix. Real-world example: GNU `ls` uses `LS_COLORS` entries like `34;42` (blue text on green background, ~1.4:1 contrast ratio) for other-writable directories, `37;41` (white on red) for setuid files, and `30;43` (black on yellow) for setgid files. These foreground-background pairs are set entirely by the tool and bypass any terminal theme adjustments. Unlike CV-9's concern (foreground vs. unknown background), CV-14 addresses cases where both colors are known and can be evaluated directly. |
+| **Test method** | (1) Capture output and extract all SGR sequences. (2) Parse compound SGR sequences to identify cases where both foreground (30-37, 90-97, 38;5;N, 38;2;R;G;B) and background (40-47, 100-107, 48;5;N, 48;2;R;G;B) are set. (3) Map 4-bit ANSI codes to xterm default RGB values: 0=#000000, 1=#800000, 2=#008000, 3=#808000, 4=#000080, 5=#800080, 6=#008080, 7=#C0C0C0, bright 0=#808080, bright 1=#FF0000, bright 2=#00FF00, bright 3=#FFFF00, bright 4=#0000FF, bright 5=#FF00FF, bright 6=#00FFFF, bright 7=#FFFFFF. (4) Calculate contrast ratio using the WCAG formula. (5) Flag any pair below 4.5:1. |
+| **Disability impact** | Visual |
+| **WCAG mapping** | 1.4.3 Contrast (Minimum) |
+| **References** | [Understanding SC 1.4.3 Contrast (Minimum)](https://www.w3.org/WAI/WCAG21/Understanding/contrast-minimum.html) |
+
+### CV-15: Unicode/Emoji Symbol Accessibility
+
+| | |
+|---|---|
+| **Level** | A |
+| **Testability** | `[SEMI]` |
+| **Requirement** | Unicode symbols and emoji used as status indicators, progress markers, or informational icons (e.g., ✓, ✗, ●, ▶, ⚠, 🔴) MUST be accompanied by a text alternative that conveys the same meaning. Screen readers announce the Unicode character name (e.g., "HEAVY CHECK MARK" for ✓, "BLACK RIGHT-POINTING TRIANGLE" for ▶), which may not convey the intended semantic meaning to users. Symbols that render as boxes or tofu (□) in terminals without appropriate fonts further degrade the experience. A `--plain` or `--ascii` mode SHOULD be available to replace Unicode symbols with ASCII text alternatives (e.g., `[OK]` instead of ✓, `[FAIL]` instead of ✗, `[WARN]` instead of ⚠). |
+| **Rationale** | Modern CLI tools increasingly use Unicode symbols for visual polish: checkmarks for pass/fail (vitest, pytest), arrows for navigation (fzf, pnpm), circles for status (systemctl), and emoji for categories. While visually appealing, these symbols create three accessibility problems: (1) Screen readers speak the Unicode name, not the intended meaning — "BLACK CIRCLE" doesn't communicate "in progress" or "selected." A user hearing "HEAVY CHECK MARK task one HEAVY MULTIPLICATION X task two" must mentally map symbol names to pass/fail semantics. (2) Terminals without the required fonts render symbols as boxes (tofu), losing all visual meaning. (3) Some symbols are visually similar across different Unicode blocks, making them confusing even for sighted users. Text alternatives (`[PASS]`, `[FAIL]`, `[WARN]`) are universally understood, work in all terminals, and are announced literally by screen readers. |
+| **Test method** | (1) Scan output for common Unicode status symbols: checkmarks (U+2713-U+2717, U+2705, U+274C), circles (U+25CF, U+25CB, U+25C9), arrows (U+25B6, U+25C0, U+2192, U+2190), warning/info signs (U+26A0, U+2139), and emoji ranges (U+1F300-U+1F9FF). (2) For each symbol found, check if adjacent text (within 3 characters before or after) provides equivalent semantic meaning. (3) Flag bare symbols without text context. (4) Check for `--plain`, `--ascii`, or `--no-unicode` flag support. |
+| **Disability impact** | Visual, Cognitive |
+| **WCAG mapping** | 1.1.1 Non-text Content |
+| **References** | [Scope: How special characters affect screen readers](https://business.scope.org.uk/accessibility-screen-readers-special-characters-and-unicode-symbols/), [Pope Tech: Making emojis and icons screen reader accessible](https://blog.pope.tech/2026/04/01/making-emojis-and-icons-screen-reader-accessible/) |
+
 ---
 
 ## 3. References
@@ -497,3 +592,7 @@ These heuristics work best with clean, predictable, linear text output. Complex 
 | [Julia Evans: Standards for ANSI escape codes](https://jvns.ca/blog/2025/03/07/escape-code-standards/) | Practical overview of ANSI escape code standards, terminal support quirks, and the semicolon vs. colon debate. |
 | Sampath, H., Merrick, A., & Macvean, A. (2021). [Accessibility of Command Line Interfaces](https://dl.acm.org/doi/abs/10.1145/3411764.3445544). CHI '21, ACM. | Seminal academic study on CLI accessibility. Documents how screen readers struggle with ANSI-formatted CLI output and how users resort to workarounds like `--json` flags and output redirection. |
 | [Seirdy: Best practices for inclusive CLIs](https://seirdy.one/posts/2022/06/10/cli-best-practices/) | Comprehensive accessibility recommendations including espeak-ng testing methodology, `NO_COLOR` guidance, and WCAG plain-text techniques. |
+| [OSC 8 Hyperlinks spec](https://gist.github.com/egmontkob/eb114294efbcd5adb1944c9f3cb5feda) | Original specification for terminal hyperlinks (OSC 8), format details, terminal support, and backward compatibility. |
+| [OSC 8 Adoption tracker](https://github.com/Alhadis/OSC8-Adoption/) | Community-maintained list of terminal emulators and CLI tools that support OSC 8 hyperlinks. |
+| [Scope: How special characters affect screen readers](https://business.scope.org.uk/accessibility-screen-readers-special-characters-and-unicode-symbols/) | How screen readers announce Unicode symbols and special characters, and why text alternatives are needed. |
+| [Pope Tech: Making emojis and icons screen reader accessible](https://blog.pope.tech/2026/04/01/making-emojis-and-icons-screen-reader-accessible/) | Practical guidance on pairing emoji and Unicode symbols with text alternatives for assistive technology users. |
