@@ -48,9 +48,46 @@ func Probe(ctx context.Context, binary string, maxSubcmds int) (*ProbeResult, er
 		}
 		result.HelpText = helpText
 
-		// Detect color in help output
-		if HasColorCodes(helpResult.Stdout) || HasColorCodes(helpResult.Stderr) {
+		// Detect ANSI usage in help output (piped mode).
+		// Check for any ANSI sequences (color, bold, underline) — not just
+		// color codes. Tools that use bold/underline still need NO_COLOR,
+		// TERM=dumb, and TTY-awareness testing.
+		if HasANSI(helpResult.Stdout) || HasANSI(helpResult.Stderr) {
 			result.HasColor = true
+		}
+
+		// If no ANSI detected in pipe mode, try forcing color output.
+		// TTY-aware tools suppress all ANSI when piped. Probe with
+		// CLICOLOR_FORCE=1 (BSD convention, used by gh) and FORCE_COLOR=1
+		// (modern standard) to detect tools that use ANSI on a real terminal.
+		if !result.HasColor {
+			forceColorResult, forceErr := Run(ctx, binary, ExecOpts{
+				Args: []string{"--help"},
+				Env: map[string]string{
+					"CLICOLOR_FORCE": "1",
+					"FORCE_COLOR":    "1",
+				},
+				Timeout: 5 * time.Second,
+			})
+			if forceErr == nil && forceColorResult.ExitCode == 0 {
+				if HasANSI(forceColorResult.Stdout) || HasANSI(forceColorResult.Stderr) {
+					result.HasColor = true
+				}
+			}
+		}
+
+		// If still nothing, try --color=always flag (common convention)
+		if !result.HasColor {
+			colorFlagResult, colorErr := Run(ctx, binary, ExecOpts{
+				Args:    []string{"--color=always", "--help"},
+				Timeout: 5 * time.Second,
+			})
+			if colorErr == nil && colorFlagResult.ExitCode == 0 {
+				if HasANSI(colorFlagResult.Stdout) || HasANSI(colorFlagResult.Stderr) {
+					result.HasColor = true
+					result.HasColorFlag = true
+				}
+			}
 		}
 
 		// Parse help text using parser cascade
