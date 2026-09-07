@@ -179,6 +179,17 @@ func Probe(ctx context.Context, binary string, maxSubcmds int) (*ProbeResult, er
 		})
 	}
 
+	// Step 6: If still no ANSI detected, check error output — some tools
+	// (like Python 3.13+) only colorize tracebacks/errors, not help.
+	if !result.HasColor && len(result.SampleErrors) > 0 {
+		for _, sample := range result.SampleErrors {
+			if HasANSI(sample.Stdout) || HasANSI(sample.Stderr) {
+				result.HasColor = true
+				break
+			}
+		}
+	}
+
 	return result, nil
 }
 

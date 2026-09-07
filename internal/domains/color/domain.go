@@ -21,6 +21,8 @@ func init() {
 	d.criteria = append(d.criteria, &CV8Check{})
 	d.criteria = append(d.criteria, &CV9Check{})
 	d.criteria = append(d.criteria, &CV12Check{})
+	d.criteria = append(d.criteria, &CV14Check{})
+	d.criteria = append(d.criteria, &CV15Check{})
 	// Load YAML-defined criteria (simple env/flag/output checks)
 	if err := d.loadCriteria(); err != nil {
 		panic(fmt.Sprintf("failed to load color domain criteria: %v", err))

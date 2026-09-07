@@ -6,6 +6,7 @@ import (
 	"math"
 	"regexp"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/sampras343/cli-accessibility-spec/internal/engine"
@@ -290,6 +291,270 @@ func (c *CV12Check) Run(ctx context.Context, binary string, p *probe.ProbeResult
 
 	result.Duration = time.Since(start)
 	return result
+}
+
+// CV-14: Foreground-Background Pair Contrast [SEMI]
+type CV14Check struct{}
+
+func (c *CV14Check) ID() string                     { return "CV-14" }
+func (c *CV14Check) Name() string                   { return "Foreground-Background Pair Contrast" }
+func (c *CV14Check) Domain() string                 { return "color" }
+func (c *CV14Check) Level() engine.Level             { return engine.LevelAA }
+func (c *CV14Check) Testability() engine.Testability { return engine.Semi }
+func (c *CV14Check) SpecVersion() string             { return "1.0" }
+
+func (c *CV14Check) Precondition(p *probe.ProbeResult) bool {
+	return p.HasColor
+}
+
+// Standard xterm default RGB values for the 16 ANSI colors.
+var ansi16RGB = [16][3]float64{
+	{0, 0, 0},          // 0  black
+	{0.502, 0, 0},      // 1  red
+	{0, 0.502, 0},      // 2  green
+	{0.502, 0.502, 0},  // 3  yellow
+	{0, 0, 0.502},      // 4  blue
+	{0.502, 0, 0.502},  // 5  magenta
+	{0, 0.502, 0.502},  // 6  cyan
+	{0.753, 0.753, 0.753}, // 7  white
+	{0.502, 0.502, 0.502}, // 8  bright black
+	{1, 0, 0},          // 9  bright red
+	{0, 1, 0},          // 10 bright green
+	{1, 1, 0},          // 11 bright yellow
+	{0, 0, 1},          // 12 bright blue
+	{1, 0, 1},          // 13 bright magenta
+	{0, 1, 1},          // 14 bright cyan
+	{1, 1, 1},          // 15 bright white
+}
+
+func (c *CV14Check) Run(ctx context.Context, binary string, p *probe.ProbeResult) *engine.Result {
+	start := time.Now()
+	result := &engine.Result{
+		ID: "CV-14", Name: c.Name(), Domain: "color",
+		Level: engine.LevelAA, Testability: engine.Semi,
+		SpecVersion: "1.0", NeedsReview: true,
+	}
+
+	out, err := probe.Run(ctx, binary, probe.ExecOpts{
+		Args: []string{"--help"},
+		Env:  map[string]string{"CLICOLOR_FORCE": "1", "FORCE_COLOR": "1"},
+	})
+	if err != nil {
+		result.Outcome = engine.OutcomeError
+		result.Remarks = fmt.Sprintf("Failed to run: %v", err)
+		result.Duration = time.Since(start)
+		return result
+	}
+
+	result.Evidence = []engine.Evidence{
+		{Command: out.Command, Stdout: string(out.Stdout), ExitCode: out.ExitCode, Duration: out.Duration},
+	}
+
+	// Find compound SGR sequences and track active fg/bg state
+	sgrPattern := regexp.MustCompile(`\x1b\[([\d;]*)m`)
+	matches := sgrPattern.FindAllSubmatch(out.Stdout, -1)
+
+	var failingPairs []string
+	activeFG := -1  // -1 = default/unset
+	activeBG := -1
+
+	for _, match := range matches {
+		params := string(match[1])
+		codes := splitSGRCodes(params)
+
+		for _, code := range codes {
+			switch {
+			case code == 0:
+				activeFG = -1
+				activeBG = -1
+			case code >= 30 && code <= 37:
+				activeFG = code - 30
+			case code >= 40 && code <= 47:
+				activeBG = code - 40
+			case code >= 90 && code <= 97:
+				activeFG = code - 90 + 8
+			case code >= 100 && code <= 107:
+				activeBG = code - 100 + 8
+			case code == 39:
+				activeFG = -1
+			case code == 49:
+				activeBG = -1
+			}
+		}
+
+		// If both fg and bg are set to ANSI 16 colors, check contrast
+		if activeFG >= 0 && activeFG < 16 && activeBG >= 0 && activeBG < 16 {
+			fgRGB := ansi16RGB[activeFG]
+			bgRGB := ansi16RGB[activeBG]
+			fgLum := relativeLuminance(fgRGB[0], fgRGB[1], fgRGB[2])
+			bgLum := relativeLuminance(bgRGB[0], bgRGB[1], bgRGB[2])
+			cr := contrastRatio(fgLum, bgLum)
+			if cr < 4.5 {
+				pair := fmt.Sprintf("fg=%d bg=%d contrast=%.1f:1", activeFG, activeBG, cr)
+				// Deduplicate
+				found := false
+				for _, p := range failingPairs {
+					if p == pair {
+						found = true
+						break
+					}
+				}
+				if !found {
+					failingPairs = append(failingPairs, pair)
+				}
+			}
+		}
+	}
+
+	if len(matches) == 0 {
+		result.Outcome = engine.NotApplicable
+		result.Remarks = "No SGR sequences found in output"
+	} else if len(failingPairs) > 0 {
+		result.Outcome = engine.DoesNotSupport
+		result.Remarks = fmt.Sprintf("Foreground-background pairs with contrast < 4.5:1: %v", failingPairs)
+	} else {
+		result.Outcome = engine.Supports
+		result.Remarks = "All foreground-background color pairs meet 4.5:1 contrast ratio, or tool does not set both fg and bg"
+	}
+
+	result.Duration = time.Since(start)
+	return result
+}
+
+func splitSGRCodes(params string) []int {
+	if params == "" {
+		return []int{0}
+	}
+	parts := regexp.MustCompile(`;`).Split(params, -1)
+	codes := make([]int, 0, len(parts))
+	for _, p := range parts {
+		if p == "" {
+			codes = append(codes, 0)
+			continue
+		}
+		n, err := strconv.Atoi(p)
+		if err == nil {
+			codes = append(codes, n)
+		}
+	}
+	return codes
+}
+
+// CV-15: Unicode/Emoji Symbol Accessibility [SEMI]
+type CV15Check struct{}
+
+func (c *CV15Check) ID() string                     { return "CV-15" }
+func (c *CV15Check) Name() string                   { return "Unicode/Emoji Symbol Accessibility" }
+func (c *CV15Check) Domain() string                 { return "color" }
+func (c *CV15Check) Level() engine.Level             { return engine.LevelA }
+func (c *CV15Check) Testability() engine.Testability { return engine.Semi }
+func (c *CV15Check) SpecVersion() string             { return "1.0" }
+
+func (c *CV15Check) Precondition(p *probe.ProbeResult) bool {
+	return p.HasHelp
+}
+
+var indicatorSymbols = []rune{
+	'✓', '✗', '✔', '✘', '☑', '☒', '⊘',
+	'●', '○', '◉', '◆', '◇', '⬤',
+	'▶', '▷', '►', '▸', '→', '←', '↑', '↓',
+	'⚠', '⚡', 'ℹ', 'ⓘ',
+}
+
+var textAlternatives = []string{
+	"OK", "PASS", "FAIL", "ERROR", "WARN", "INFO", "SUCCESS",
+	"YES", "NO", "DONE", "SKIP", "NOTE",
+	"[ok]", "[pass]", "[fail]", "[error]", "[warn]",
+	"ok", "pass", "fail", "error", "warn", "info",
+}
+
+func (c *CV15Check) Run(ctx context.Context, binary string, p *probe.ProbeResult) *engine.Result {
+	start := time.Now()
+	result := &engine.Result{
+		ID: "CV-15", Name: c.Name(), Domain: "color",
+		Level: engine.LevelA, Testability: engine.Semi,
+		SpecVersion: "1.0", NeedsReview: true,
+	}
+
+	out, err := probe.Run(ctx, binary, probe.ExecOpts{Args: []string{"--help"}})
+	if err != nil {
+		result.Outcome = engine.OutcomeError
+		result.Remarks = fmt.Sprintf("Failed to run: %v", err)
+		result.Duration = time.Since(start)
+		return result
+	}
+
+	result.Evidence = []engine.Evidence{
+		{Command: out.Command, Stdout: string(out.Stdout), ExitCode: out.ExitCode, Duration: out.Duration},
+	}
+
+	content := string(probe.StripANSI(out.Stdout))
+	runes := []rune(content)
+
+	var bareSymbols []string
+	var pairedSymbols []string
+	symbolSet := make(map[rune]bool)
+	for _, s := range indicatorSymbols {
+		symbolSet[s] = true
+	}
+
+	for i, r := range runes {
+		if !symbolSet[r] && !isEmoji(r) {
+			continue
+		}
+		// Check surrounding context (20 chars before and after) for text alternatives
+		contextStart := i - 20
+		if contextStart < 0 {
+			contextStart = 0
+		}
+		contextEnd := i + 20
+		if contextEnd > len(runes) {
+			contextEnd = len(runes)
+		}
+		surrounding := strings.ToLower(string(runes[contextStart:contextEnd]))
+
+		hasText := false
+		for _, alt := range textAlternatives {
+			if strings.Contains(surrounding, strings.ToLower(alt)) {
+				hasText = true
+				break
+			}
+		}
+
+		sym := fmt.Sprintf("%c (U+%04X)", r, r)
+		if hasText {
+			pairedSymbols = append(pairedSymbols, sym)
+		} else {
+			bareSymbols = append(bareSymbols, sym)
+		}
+	}
+
+	totalSymbols := len(bareSymbols) + len(pairedSymbols)
+
+	if totalSymbols == 0 {
+		result.Outcome = engine.Supports
+		result.Remarks = "No Unicode indicator symbols or emoji found in output"
+	} else if len(bareSymbols) == 0 {
+		result.Outcome = engine.Supports
+		result.Remarks = fmt.Sprintf("%d symbols found, all have adjacent text alternatives: %v", totalSymbols, pairedSymbols)
+	} else if len(pairedSymbols) > 0 {
+		result.Outcome = engine.PartiallySupports
+		result.Remarks = fmt.Sprintf("%d symbols without text context: %v; %d with text: %v", len(bareSymbols), bareSymbols, len(pairedSymbols), pairedSymbols)
+	} else {
+		result.Outcome = engine.DoesNotSupport
+		result.Remarks = fmt.Sprintf("%d symbols used without text alternatives: %v", len(bareSymbols), bareSymbols)
+	}
+
+	result.Duration = time.Since(start)
+	return result
+}
+
+func isEmoji(r rune) bool {
+	return (r >= 0x1F300 && r <= 0x1F9FF) ||
+		(r >= 0x2600 && r <= 0x26FF) ||
+		(r >= 0x2700 && r <= 0x27BF) ||
+		(r >= 0x1FA00 && r <= 0x1FA6F) ||
+		(r >= 0x1FA70 && r <= 0x1FAFF)
 }
 
 // computeSimilarity returns a 0.0-1.0 score of how similar two strings are.

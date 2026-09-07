@@ -6,7 +6,7 @@ A CLI-native accessibility standard that defines measurable criteria for evaluat
 
 Existing accessibility frameworks (WCAG 2.2, EN 301 549, Section 508) apply to CLI tools in principle but provide little CLI-specific guidance. Current conformance reports (VPATs) for CLI tools are often meaningless — marking criteria like "Pointer Gestures" and "Dragging Movements" as "Supports" for text-based tools, or marking everything "Not Applicable."
 
-CLI-ACS addresses this gap with 95 criteria native to the CLI context, organized by functional domain, mapped to disability categories, and tagged with testability classifications.
+CLI-ACS addresses this gap with 98 criteria native to the CLI context, organized by functional domain, mapped to disability categories, and tagged with testability classifications.
 
 ## Quick Start
 
@@ -363,7 +363,7 @@ Each criterion should also have a companion `testcase.md` documenting what it te
 
 The conformance criteria are defined in the CLI-ACS specification:
 
-- [CLI-ACS v1.0 Specification](spec/CLI_ACS_v1.0.md) — 95 criteria across 9 domains + TUI extension
+- [CLI-ACS v1.0 Specification](spec/CLI_ACS_v1.0.md) — 98 criteria across 9 domains + TUI extension
 - [Color & Visual Presentation (detailed)](spec/color-and-visual-presentation.md) — deep-dive on terminal color tiers, SGR attributes, color vision deficiency, and contrast
 - [Conformance Suite Design](spec/conformance-suite-design.md) — architecture, YAML DSL, probe system, safety model
 
@@ -371,19 +371,19 @@ The conformance criteria are defined in the CLI-ACS specification:
 
 | Level | Core CLI | TUI Extension | Total |
 |---|---|---|---|
-| A (Minimum) | 27 | 5 | 32 |
-| AA (Standard) | 38 | 6 | 44 |
+| A (Minimum) | 28 | 5 | 33 |
+| AA (Standard) | 40 | 6 | 46 |
 | AAA (Enhanced) | 16 | 3 | 19 |
-| **Total** | **81** | **14** | **95** |
+| **Total** | **84** | **14** | **98** |
 
-53% of criteria (50 of 95) are fully automatable by the conformance suite.
+51% of criteria (50 of 98) are fully automatable by the conformance suite.
 
 ### Domains
 
 | Domain | Criteria | What it covers |
 |---|---|---|
 | Output Structure | OS-1 to OS-10 | Stream separation, exit codes, clean piped output, machine-readable formats |
-| Color & Visual | CV-1 to CV-12 | NO_COLOR, TERM=dumb, TTY-aware color, 4-bit ANSI preference, contrast |
+| Color & Visual | CV-1 to CV-15 | NO_COLOR, TERM=dumb, TTY-aware color, 4-bit ANSI preference, contrast, OSC 8 hyperlinks, fg/bg pair contrast, Unicode symbol accessibility |
 | Help & Documentation | HD-1 to HD-13 | --help/-h, --version, subcommand help, man pages, shell completions |
 | Error Handling | EF-1 to EF-10 | Errors to stderr, exit codes, human-readable messages, actionable suggestions |
 | Interactivity | II-1 to II-11 | Non-interactive mode, Ctrl-C, password masking, dry-run, keyboard navigation |

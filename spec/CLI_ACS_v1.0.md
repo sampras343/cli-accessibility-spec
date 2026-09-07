@@ -366,8 +366,8 @@ This domain covers how CLI tools use color, contrast, and visual styling in term
 |---|---|
 | **Level** | A |
 | **Testability** | `[AUTO]` |
-| **Requirement** | When the `TERM` environment variable is set to `dumb`, the tool MUST suppress all ANSI escape sequences — not just color, but also cursor movement, screen clearing, and text styling. `TERM=dumb` signals a terminal with no capability for escape sequence interpretation. |
-| **Test method** | Run the tool with `TERM=dumb` and capture output. Scan for any ANSI escape sequences (not just color). Verify none are present. |
+| **Requirement** | When the `TERM` environment variable is set to `dumb`, the tool MUST suppress ALL escape sequences — this includes SGR color and styling codes (`\x1b[...m`), CSI cursor movement (`\x1b[A`–`\x1b[D`, `\x1b[H`), screen/line clearing (`\x1b[2J`, `\x1b[K`), OSC sequences including terminal hyperlinks (`\x1b]8;;...`), and any other ECMA-48 control sequences. `TERM=dumb` signals a terminal with zero capability for escape sequence interpretation. When `TERM` is empty or unset, the tool SHOULD behave as if `TERM=dumb`. |
+| **Test method** | Run the tool with `TERM=dumb` and capture raw output bytes. Scan for ALL escape sequence types: CSI sequences (`\x1b\[`), OSC sequences (`\x1b\]`), and other escape types. Verify none are present. Also run with `TERM=` (empty) and verify the same behavior. |
 | **Disability impact** | Visual |
 | **WCAG mapping** | — |
 
@@ -377,7 +377,7 @@ This domain covers how CLI tools use color, contrast, and visual styling in term
 |---|---|
 | **Level** | AA |
 | **Testability** | `[AUTO]` |
-| **Requirement** | The tool SHOULD support a `--color=WHEN` flag accepting at least three values: `always` (force color regardless of TTY/environment), `never` (suppress color), and `auto` (default behavior — enable color only when output is a TTY and `NO_COLOR`/`TERM=dumb` are not set). |
+| **Requirement** | The tool SHOULD support a `--color=WHEN` flag accepting at least three values: `always` (force color regardless of TTY/environment), `never` (suppress color), and `auto` (default behavior — enable color only when output is a TTY and `NO_COLOR`/`TERM=dumb` are not set). Tools MAY use non-standard flag names for the same concept (e.g., GCC uses `-fdiagnostics-color=auto/always/never`). Such tools satisfy the intent of this criterion if the flag provides equivalent auto/always/never modes. |
 | **Test method** | Test `--color=never` (verify no ANSI color codes), `--color=always` with piped output (verify ANSI color codes present), and `--color=auto` with both TTY and non-TTY stdout. |
 | **Disability impact** | Visual, Motor |
 | **WCAG mapping** | — |
@@ -447,6 +447,39 @@ This domain covers how CLI tools use color, contrast, and visual styling in term
 | **Test method** | Run the tool with `TERM=dumb` (stripping all styling). Compare structural readability with styled output. Verify that sections, headings, and emphasis remain distinguishable through text formatting alone. |
 | **Disability impact** | Visual, Cognitive |
 | **WCAG mapping** | 1.3.1 Info and Relationships |
+
+#### CV-13: Terminal Hyperlink Accessibility
+
+| | |
+|---|---|
+| **Level** | AA |
+| **Testability** | `[SEMI]` |
+| **Requirement** | When the tool emits OSC 8 terminal hyperlinks (`\x1b]8;;URI\a text \x1b]8;;\a`), the linked text MUST be meaningful on its own without the hyperlink — the URL MUST NOT be the only way to discover the link target. OSC 8 sequences MUST be suppressed when `TERM=dumb` is set and SHOULD be suppressed when `NO_COLOR` is set. Tools MUST NOT rely on hyperlink functionality as the only means of providing a reference, since screen readers and many terminal emulators do not support OSC 8. |
+| **Test method** | Run with `TERM=dumb` and scan output for OSC 8 sequences (`\x1b]8;`). Run with `NO_COLOR=1` and scan. If hyperlinks are present in default output, verify the linked text is descriptive (not just "click here" or "link"). Verify the information is accessible without the hyperlink. |
+| **Disability impact** | Visual |
+| **WCAG mapping** | 2.4.4 Link Purpose (In Context) |
+
+#### CV-14: Foreground-Background Pair Contrast
+
+| | |
+|---|---|
+| **Level** | AA |
+| **Testability** | `[SEMI]` |
+| **Requirement** | When the tool sets both foreground AND background colors in its output (e.g., colored status badges, highlighted sections, LS_COLORS-style file type indicators), the contrast ratio between the foreground and background colors MUST be at least 4.5:1 for normal text. This applies to 4-bit ANSI color pairs (using xterm default RGB mappings), fixed 8-bit color pairs, and 24-bit color pairs. The tool MUST NOT produce foreground-background combinations that fail this ratio in its default configuration. |
+| **Test method** | Capture output and extract all SGR sequences that set both foreground (30–37, 90–97, 38;5;N, 38;2;R;G;B) and background (40–47, 100–107, 48;5;N, 48;2;R;G;B) colors. Map 4-bit ANSI codes to their xterm default RGB values. Calculate contrast ratio using the WCAG relative luminance formula. Flag any pair below 4.5:1. |
+| **Disability impact** | Visual |
+| **WCAG mapping** | 1.4.3 Contrast (Minimum) |
+
+#### CV-15: Unicode/Emoji Symbol Accessibility
+
+| | |
+|---|---|
+| **Level** | A |
+| **Testability** | `[SEMI]` |
+| **Requirement** | Unicode symbols and emoji used as status indicators, progress markers, or informational icons (e.g., ✓, ✗, ●, ▶, ⚠, 🔴) MUST be accompanied by a text alternative that conveys the same meaning. Screen readers announce the Unicode character name (e.g., "HEAVY CHECK MARK"), which may not convey the intended semantic meaning. Symbols that render as boxes or tofu (□) in terminals without appropriate fonts further degrade the experience. A `--plain` or `--ascii` mode SHOULD be available to replace Unicode symbols with ASCII text alternatives (e.g., `[OK]` instead of `✓`, `[FAIL]` instead of `✗`). |
+| **Test method** | Scan output for common Unicode status symbols: checkmarks (U+2713–U+2717), circles (U+25CF, U+25CB), arrows (U+25B6, U+25C0, U+2192), warning signs (U+26A0), and emoji (U+1F300–U+1F9FF). For each symbol found, verify adjacent text provides equivalent meaning. Flag bare symbols without text context. |
+| **Disability impact** | Visual, Cognitive |
+| **WCAG mapping** | 1.1.1 Non-text Content |
 
 ---
 
@@ -1547,6 +1580,9 @@ This table maps CLI-ACS criteria to their corresponding requirements in WCAG 2.2
 | CV-8 | 4-Bit ANSI Preference | 1.4.3 Contrast (Minimum) | 11.1.4.3 | Ch. 5, 502.3.1 |
 | CV-9 | No Background Assumption | 1.4.3 Contrast (Minimum) | 11.1.4.3 | Ch. 5, 502.3.1 |
 | CV-12 | Bold/Underline Structural | 1.3.1 Info and Relationships | 11.1.3.1 | Ch. 5, 502.3.1 |
+| CV-13 | Terminal Hyperlink A11y | 2.4.4 Link Purpose (In Context) | 11.2.4.4 | Ch. 5, 502.3.1 |
+| CV-14 | FG-BG Pair Contrast | 1.4.3 Contrast (Minimum) | 11.1.4.3 | Ch. 5, 502.3.1 |
+| CV-15 | Unicode/Emoji Symbol A11y | 1.1.1 Non-text Content | 11.1.1.1 | Ch. 5, 502.3.1 |
 | HD-1 | --help and -h | 3.3.2 Labels or Instructions | 11.3.3.2 | Ch. 5, 502.3.1 |
 | HD-4 | Missing-Arg Guidance | 3.3.1 Error Identification | 11.3.3.1 | Ch. 5, 502.3.1 |
 | HD-5 | Help Text Structure | 1.3.1, 2.4.6 | 11.1.3.1, 11.2.4.6 | Ch. 5, 502.3.1 |
@@ -1667,6 +1703,9 @@ The following CLI-ACS criteria address CLI-specific accessibility concerns that 
 | CV-10 | Configuration Precedence | AA | AUTO | ● | | | |
 | CV-11 | High Contrast Support | AAA | MANUAL | ● | | | |
 | CV-12 | Bold/Underline Structural | AAA | SEMI | ● | | ● | |
+| CV-13 | Terminal Hyperlink A11y | AA | SEMI | ● | | | |
+| CV-14 | FG-BG Pair Contrast | AA | SEMI | ● | | | |
+| CV-15 | Unicode/Emoji Symbol A11y | A | SEMI | ● | | ● | |
 | **Help & Documentation** |||||||
 | HD-1 | --help and -h Flags | A | AUTO | ● | | ● | |
 | HD-2 | Subcommand Help | A | AUTO | ● | | ● | |
@@ -1758,14 +1797,14 @@ The following CLI-ACS criteria address CLI-specific accessibility concerns that 
 | Classification | Core CLI | TUI Extension | Total |
 |---|---|---|---|
 | `[AUTO]` — Fully Automated | 49 | 1 | 50 |
-| `[SEMI]` — Semi-Automated | 28 | 3 | 31 |
+| `[SEMI]` — Semi-Automated | 31 | 3 | 34 |
 | `[MANUAL]` — Manual AT Testing | 4 | 10 | 14 |
-| **Total** | **81** | **14** | **95** |
+| **Total** | **84** | **14** | **98** |
 
 Note: EC-1 and EC-2 are cross-references to CV-2 and CV-5 respectively. They are counted once (under Color & Visual Presentation, as CV-2 and CV-5). The unique criteria count is:
 
-- **Core CLI:** 81 unique criteria (27 Level A, 38 Level AA, 16 Level AAA)
+- **Core CLI:** 84 unique criteria (28 Level A, 40 Level AA, 16 Level AAA)
 - **TUI Extension:** 14 unique criteria (5 Level A, 6 Level AA, 3 Level AAA)
-- **Grand Total:** 95 unique testable criteria
+- **Grand Total:** 98 unique testable criteria
 
-Of these, 50 (53%) are fully automatable by a conformance suite, enabling meaningful accessibility evaluation of any CLI binary without requiring manual testing for over half the criteria.
+Of these, 50 (51%) are fully automatable by a conformance suite, enabling meaningful accessibility evaluation of any CLI binary without requiring manual testing for over half the criteria.

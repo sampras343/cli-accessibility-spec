@@ -5,35 +5,42 @@ level: A
 testability: AUTO
 spec_version: "1.0"
 type: yaml
-last_reviewed: 2026-09-06
+last_reviewed: 2026-09-07
 ---
 
 # CV-5: TERM=dumb Respect
 
 ## What This Tests
 
-Whether the tool respects the `TERM=dumb` environment variable and suppresses ANSI color codes and other terminal formatting when running in a basic terminal environment.
+Whether the tool suppresses ALL ANSI escape sequences — not just color
+codes, but also cursor movement, screen clearing, text styling, erase
+in line, and OSC sequences — when `TERM=dumb` is set.
+
+`TERM=dumb` signals a terminal with zero capability for escape sequence
+interpretation (e.g., Emacs shell buffers, CI log viewers, serial
+consoles). Any escape byte (`\x1b`) in output indicates a violation.
 
 ## How The Test Works
 
-1. Runs the binary with `TERM=dumb` set and `--help`
-2. Scans stdout for ANSI SGR color sequences (3-bit, 8-bit, and 24-bit color codes)
-3. Verifies exit code is 0 (command succeeds)
+1. Runs the binary with `TERM=dumb` and `--help`
+2. Scans stdout for ANY occurrence of the ESC byte (`\x1b`, 0x1B)
+3. This catches all escape types: CSI color codes (`\x1b[31m`), cursor
+   movement (`\x1b[H`), erase in line (`\x1b[K`), OSC sequences
+   (`\x1b]8;`), and any other ANSI escapes
 
 ## Pass Criteria
 
+- No ESC byte (`\x1b`) present anywhere in stdout when `TERM=dumb`
 - Exit code is 0
-- No ANSI color escape sequences in stdout when `TERM=dumb` is set
-- Tool detects dumb terminal and disables color/formatting
 
 ## Fail Criteria
 
-- ANSI color escape sequences found in output despite `TERM=dumb`
-- Tool ignores TERM environment variable
-- Command fails (non-zero exit code)
+- Any ESC byte found in stdout — indicates the tool emits escape
+  sequences in a context that cannot interpret them
+- Common violations: GCC emitting `\x1b[K` (Erase in Line), tools
+  emitting bold (`\x1b[1m`) despite `TERM=dumb`
 
 ## References
 
 - CLI-ACS v1.0 spec, Section 4.2, CV-5
-- TERM environment variable specification
-- Common practice in CLI tools to respect TERM=dumb
+- POSIX terminal handling: `TERM=dumb` indicates no terminfo capabilities
