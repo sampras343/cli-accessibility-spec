@@ -418,7 +418,17 @@ func (c *HD6Check) Run(ctx context.Context, binary string, p *probe.ProbeResult)
 		}
 
 		// Lines containing the binary name with arguments (likely usage examples)
-		if strings.Contains(trimmed, binaryName+" ") && !strings.HasPrefix(strings.ToLower(trimmed), "usage") {
+		// Exclude: usage synopsis, cross-references, help topic listings,
+		// and lines with placeholder patterns like [command] or <arg>.
+		if strings.Contains(trimmed, binaryName+" ") &&
+			!strings.HasPrefix(strings.ToLower(trimmed), "usage") &&
+			!strings.Contains(strings.ToLower(trimmed), "use \"") &&
+			!strings.Contains(strings.ToLower(trimmed), "use '") &&
+			!strings.Contains(strings.ToLower(trimmed), "see ") &&
+			!strings.Contains(trimmed, "[command]") &&
+			!strings.Contains(trimmed, "<command>") &&
+			!strings.Contains(trimmed, "not built with") &&
+			(strings.HasPrefix(trimmed, "$") || strings.HasPrefix(trimmed, "#") || strings.HasPrefix(trimmed, ">")) {
 			exampleLineCount++
 		}
 	}
@@ -1015,7 +1025,7 @@ func (c *HD15Check) Run(ctx context.Context, binary string, p *probe.ProbeResult
 		{Command: binary + " --help", Stdout: truncate(helpText, 1000), Note: "Help text from probe"},
 	}
 
-	// Count flags
+	// Count flags in top-level help
 	lines := strings.Split(helpText, "\n")
 	flagLineRe := regexp.MustCompile(`^\s+--?\w`)
 	flagCount := 0
@@ -1025,9 +1035,45 @@ func (c *HD15Check) Run(ctx context.Context, binary string, p *probe.ProbeResult
 		}
 	}
 
-	if flagCount < 20 {
+	// If top-level has few flags but has subcommands, sample a few
+	// subcommands' help to find the one with the most flags — tools like
+	// cosign have 4 global flags but 50+ per subcommand.
+	maxSubcmdFlags := 0
+	maxSubcmdName := ""
+	if flagCount < 20 && p.HasSubcommands && len(p.Subcommands) > 0 {
+		sampled := p.Subcommands
+		if len(sampled) > 5 {
+			sampled = sampled[:5]
+		}
+		for _, sub := range sampled {
+			subFlags := 0
+			subOut, err := probe.Run(ctx, binary, probe.ExecOpts{
+				Args:    []string{sub.Name, "--help"},
+				Timeout: 5 * time.Second,
+			})
+			if err == nil && subOut.ExitCode == 0 {
+				for _, l := range strings.Split(string(subOut.Stdout), "\n") {
+					if flagLineRe.MatchString(l) {
+						subFlags++
+					}
+				}
+			}
+			if subFlags > maxSubcmdFlags {
+				maxSubcmdFlags = subFlags
+				maxSubcmdName = sub.Name
+			}
+		}
+		_ = maxSubcmdName
+	}
+
+	effectiveFlags := flagCount
+	if maxSubcmdFlags > effectiveFlags {
+		effectiveFlags = maxSubcmdFlags
+	}
+
+	if effectiveFlags < 20 {
 		result.Outcome = engine.NotApplicable
-		result.Remarks = fmt.Sprintf("Only %d flags detected; grouping recommended for tools with 20+ flags", flagCount)
+		result.Remarks = fmt.Sprintf("Only %d flags detected (global: %d, largest subcommand: %d); grouping recommended for tools with 20+ flags", effectiveFlags, flagCount, maxSubcmdFlags)
 		result.Duration = time.Since(start)
 		return result
 	}
@@ -1123,12 +1169,20 @@ func (c *HD16Check) Run(ctx context.Context, binary string, p *probe.ProbeResult
 		}
 	}
 
-	// Count flags that take values (from probe data)
+	// Count flags that take values — check both probe data AND help text.
+	// Some tools (cosign) use --flag=default format that the probe may not
+	// detect as TakesValue, so also scan help text for = patterns in flags.
 	valueFlagCount := 0
 	for _, f := range p.GlobalFlags {
 		if f.TakesValue {
 			valueFlagCount++
 		}
+	}
+	// Also detect flags with = in help text (e.g., --timeout=3m0s, --format=json)
+	flagWithValueRe := regexp.MustCompile(`--\w[\w-]+=\S+`)
+	helpFlagValues := flagWithValueRe.FindAllString(helpText, -1)
+	if len(helpFlagValues) > valueFlagCount {
+		valueFlagCount = len(helpFlagValues)
 	}
 
 	if len(foundEnums) > 0 {
