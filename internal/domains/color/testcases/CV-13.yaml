@@ -1,0 +1,26 @@
+id: "CV-13"
+domain: "color"
+level: "AA"
+testability: "SEMI"
+spec_version: "1.0"
+name: "Terminal Hyperlink Accessibility"
+requires: [uses_color]
+steps:
+  - name: "No OSC 8 hyperlinks with TERM=dumb"
+    exec:
+      args: ["--help"]
+      env:
+        TERM: "dumb"
+    assert:
+      exit_code: 0
+      stdout_not_matches: ['\x1b\]8;']
+  - name: "No OSC 8 hyperlinks with NO_COLOR=1"
+    exec:
+      args: ["--help"]
+      env:
+        NO_COLOR: "1"
+    assert:
+      exit_code: 0
+      stdout_not_matches: ['\x1b\]8;']
+result_on_all_pass: "Supports"
+result_on_any_fail: "Does Not Support"

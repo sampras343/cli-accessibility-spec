@@ -1,0 +1,28 @@
+id: "CV-7"
+domain: "color"
+level: "AA"
+testability: "AUTO"
+spec_version: "1.0"
+name: "FORCE_COLOR Support"
+requires: [uses_color]
+steps:
+  - name: "FORCE_COLOR=1 forces color in piped output"
+    exec:
+      args: ["--help"]
+      env:
+        FORCE_COLOR: "1"
+    assert:
+      exit_code: 0
+      stdout_matches: ['\x1b\[']
+
+  - name: "FORCE_COLOR overrides NO_COLOR"
+    exec:
+      args: ["--help"]
+      env:
+        NO_COLOR: "1"
+        FORCE_COLOR: "1"
+    assert:
+      exit_code: 0
+      stdout_matches: ['\x1b\[']
+result_on_all_pass: "Supports"
+result_on_any_fail: "Does Not Support"

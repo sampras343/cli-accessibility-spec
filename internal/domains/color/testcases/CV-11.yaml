@@ -1,0 +1,9 @@
+id: "CV-11"
+domain: "color"
+level: "AAA"
+testability: "MANUAL"
+spec_version: "1.0"
+name: "High Contrast Mode Support"
+steps: []
+result_on_all_pass: "Not Evaluated"
+result_on_any_fail: "Not Evaluated"

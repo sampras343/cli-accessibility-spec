@@ -1,0 +1,27 @@
+id: "CV-10"
+domain: "color"
+level: "AA"
+testability: "AUTO"
+spec_version: "1.0"
+name: "Color Configuration Precedence"
+requires: [uses_color]
+steps:
+  - name: "NO_COLOR suppresses color"
+    exec:
+      args: ["--help"]
+      env:
+        NO_COLOR: "1"
+    assert:
+      exit_code: 0
+      stdout_not_matches: ['\x1b\[(3[0-7]|9[0-7]|38;5;\d+|38;2;\d+;\d+;\d+)m']
+
+  - name: "TERM=dumb suppresses all ANSI"
+    exec:
+      args: ["--help"]
+      env:
+        TERM: "dumb"
+    assert:
+      exit_code: 0
+      stdout_not_matches: ['\x1b\[']
+result_on_all_pass: "Supports"
+result_on_any_fail: "Does Not Support"
