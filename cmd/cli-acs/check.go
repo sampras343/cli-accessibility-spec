@@ -10,6 +10,7 @@ import (
 
 	"github.com/sampras343/cli-accessibility-spec/internal/domains"
 	_ "github.com/sampras343/cli-accessibility-spec/internal/domains/color"
+	_ "github.com/sampras343/cli-accessibility-spec/internal/domains/help"
 	"github.com/sampras343/cli-accessibility-spec/internal/engine"
 	"github.com/sampras343/cli-accessibility-spec/internal/report"
 	"github.com/spf13/cobra"

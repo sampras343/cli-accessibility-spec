@@ -1,0 +1,15 @@
+id: "HD-4"
+domain: "help"
+level: "A"
+testability: "AUTO"
+spec_version: "1.0"
+name: "Missing-Argument Guidance"
+steps:
+  - name: "Unknown flag triggers error with help pointer"
+    exec:
+      args: ["--nonexistent-flag-a11y-probe"]
+    assert:
+      exit_code_nonzero: true
+      stderr_matches: ['(?i)(help|--help|usage)']
+result_on_all_pass: "Supports"
+result_on_any_fail: "Does Not Support"
