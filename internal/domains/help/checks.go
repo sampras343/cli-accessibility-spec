@@ -304,7 +304,7 @@ func detectHelpSections(lines []string) []string {
 
 	usageRe := regexp.MustCompile(`(?i)^(usage|synopsis)\s*:`)
 	flagsRe := regexp.MustCompile(`(?i)^(options|flags|global flags|global options)\s*:?\s*$`)
-	commandsRe := regexp.MustCompile(`(?i)^(commands|available commands|subcommands)\s*:?\s*$`)
+	commandsRe := regexp.MustCompile(`(?i)^(\w[\w\s]*\s+)?commands?\s*:?\s*$`)
 	examplesRe := regexp.MustCompile(`(?i)^(examples?)\s*:?\s*$`)
 	flagLineRe := regexp.MustCompile(`^\s+--?\w`)
 
