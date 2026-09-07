@@ -16,6 +16,12 @@ var testcaseFS embed.FS
 
 func init() {
 	d := &ColorDomain{}
+	// Register Go-defined criteria (complex checks requiring multi-step logic)
+	d.criteria = append(d.criteria, &CV1Check{})
+	d.criteria = append(d.criteria, &CV8Check{})
+	d.criteria = append(d.criteria, &CV9Check{})
+	d.criteria = append(d.criteria, &CV12Check{})
+	// Load YAML-defined criteria (simple env/flag/output checks)
 	if err := d.loadCriteria(); err != nil {
 		panic(fmt.Sprintf("failed to load color domain criteria: %v", err))
 	}
